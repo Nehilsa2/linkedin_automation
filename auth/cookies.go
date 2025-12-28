@@ -61,4 +61,3 @@ func LoadCookies(browser *rod.Browser) error {
 
 	return browser.SetCookies(params)
 }
-

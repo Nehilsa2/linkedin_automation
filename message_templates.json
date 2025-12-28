@@ -1,0 +1,47 @@
+{
+  "templates": [
+    {
+      "name": "follow_up_generic",
+      "content": "Hi {name}! Thanks for connecting. I noticed you're working at {company} - would love to learn more about your work. Looking forward to staying in touch!",
+      "description": "Generic follow-up message for new connections",
+      "variables": [
+        "{name}",
+        "{company}"
+      ]
+    },
+    {
+      "name": "follow_up_software",
+      "content": "Hi {name}! Great to connect with a fellow developer. I see you're at {company} - always interested to hear about the tech stack and challenges teams are tackling. What are you working on these days?",
+      "description": "Follow-up for software engineers",
+      "variables": [
+        "{name}",
+        "{company}"
+      ]
+    },
+    {
+      "name": "follow_up_recruiter",
+      "content": "Hi {name}, thanks for connecting! I'm always open to hearing about interesting opportunities. Feel free to reach out if you come across anything that might be a good fit.",
+      "description": "Follow-up for recruiters/HR",
+      "variables": [
+        "{name}"
+      ]
+    },
+    {
+      "name": "follow_up_founder",
+      "content": "Hi {name}! Excited to connect. I saw you're building something at {company} - would love to hear more about your journey. Always inspiring to connect with fellow builders!",
+      "description": "Follow-up for founders/entrepreneurs",
+      "variables": [
+        "{name}",
+        "{company}"
+      ]
+    },
+    {
+      "name": "follow_up_simple",
+      "content": "Hi {name}! Thanks for accepting my connection request. Looking forward to staying in touch!",
+      "description": "Simple thank you message",
+      "variables": [
+        "{name}"
+      ]
+    }
+  ]
+}
