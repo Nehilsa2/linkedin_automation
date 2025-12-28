@@ -67,14 +67,14 @@ func main() {
 	}
 
 	// ==================== CONNECTION WORKFLOW ====================
-	if RunConnectionWorkflow {
-		RunConnections(browser, people)
-	}
+	// if RunConnectionWorkflow {
+	// 	RunConnections(browser, people)
+	// }
 
-	// ==================== MESSAGING WORKFLOW ====================
-	if RunMessagingWorkflow {
-		RunMessaging(browser)
-	}
+	// // ==================== MESSAGING WORKFLOW ====================
+	// if RunMessagingWorkflow {
+	// 	RunMessaging(browser)
+	// }
 
 	fmt.Println("\n✅ All workflows completed!")
 }
