@@ -20,9 +20,11 @@ func ClickNextPage(page *rod.Page) (bool, error) {
 	page = page.Timeout(10 * time.Second)
 	defer page.CancelTimeout()
 
-	// Scroll to bottom to ensure pagination is loaded
-	page.MustEval(`() => window.scrollTo(0, document.body.scrollHeight)`)
-	humanize.SleepMillis(800, 1500)
+	// Human-like scroll to bottom to ensure pagination is loaded
+	humanize.ScrollDown(page)
+	humanize.SleepMillis(500, 1000)
+	humanize.ScrollDown(page)
+	humanize.SleepMillis(300, 600)
 
 	// Execute JavaScript to find and click the Next button
 	result := page.MustEval(`() => {

@@ -95,6 +95,9 @@ func FindPeople(browser *rod.Browser, keyword string, maxPages int) ([]string, e
 
 	for pageNum := 1; pageNum <= maxPages; pageNum++ {
 
+		// Human-like browsing: scroll through results naturally
+		scrollAndBrowse(page)
+
 		// Extract profiles (even if zero)
 		pageLinks := 0
 		anchors, _ := page.Elements(`a[href^="https://www.linkedin.com/in/"]`)

@@ -23,6 +23,10 @@ func FindCompanies(browser *rod.Browser, keyword string, maxPages int) ([]string
 			0,
 		)
 		fmt.Println("DEBUG: company results appeared")
+
+		// Human-like browsing: scroll through results naturally
+		scrollAndBrowse(page)
+
 		links, _ := ExtractCompanyProfiles(page)
 
 		for _, l := range links {
