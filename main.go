@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/launcher"
 	"github.com/joho/godotenv"
 
 	"github.com/Nehilsa2/linkedin_automation/auth"
 	"github.com/Nehilsa2/linkedin_automation/persistence"
-	"github.com/Nehilsa2/linkedin_automation/stealth"
 )
 
 // Configuration - Set these to control which workflows run
@@ -65,16 +66,15 @@ func main() {
 	// Check for resumable workflows
 	checkResumableWorkflows()
 
-	// ==================== STEALTH BROWSER SETUP ====================
-	// Create browser with anti-detection measures:
-	// - Removes navigator.webdriver flag
-	// - Randomizes user agent and viewport
-	// - Injects fingerprint masking scripts
-	stealthConfig := stealth.DefaultConfig()
-	browser, err := stealth.CreateStealthBrowser(stealthConfig)
-	if err != nil {
-		log.Fatal("❌ Failed to create stealth browser:", err)
-	}
+	// ==================== BROWSER SETUP ====================
+	// Simple browser setup with minimal anti-detection
+	// Only disables the webdriver flag - nothing else
+	u := launcher.New().
+		Set("disable-blink-features", "AutomationControlled").
+		Leakless(false).
+		MustLaunch()
+
+	browser := rod.New().ControlURL(u).MustConnect()
 
 	defer browser.MustClose()
 

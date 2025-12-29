@@ -4,44 +4,67 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/go-rod/rod"
+
+	"github.com/Nehilsa2/linkedin_automation/humanize"
 )
 
 // Login to linkedin using credentials
+//
+// WHY HUMAN-LIKE TYPING FOR LOGIN:
+// - MustInput() types at ~1000 chars/second (superhuman speed)
+// - LinkedIn monitors: "Email typed in 10ms" = bot flag
+// - Human typing: 40-60 WPM with natural variation
+// - Credentials are typed slightly faster (familiar text)
 func Login(browser *rod.Browser) error {
-	//take the email from env
+	// Take the email from env
 	email := os.Getenv("LINKEDIN_EMAIL")
 	password := os.Getenv("LINKEDIN_PASSWORD")
 
-	//check if credentials are missing
+	// Check if credentials are missing
 	if email == "" || password == "" {
 		return fmt.Errorf("Linkedin email or password is missing")
 	}
 
-	//login page
+	// Login page
 	page := browser.MustPage("https://www.linkedin.com/login")
 	page.MustWaitLoad()
+	humanize.Sleep(2, 3) // Wait for page to fully render
 
-	//fill email
-	page.MustElement(`input#username`).MustInput(email)
-	time.Sleep(1 * time.Second)
+	// Wait for email input to be ready
+	fmt.Println("⌨️ Typing email...")
+	emailInput := page.MustElement(`input#username`)
+	emailInput.MustWaitVisible()
+	emailInput.MustFocus()
+	humanize.SleepMillis(300, 500) // Pause before typing
+	err := humanize.TypeCredential(emailInput, email)
+	if err != nil {
+		return fmt.Errorf("failed to type email: %w", err)
+	}
+	humanize.Sleep(1, 2) // Pause between fields (like a human tabbing)
 
-	page.MustElement(`input#password`).MustInput(password)
-	time.Sleep(3 * time.Second)
+	// Fill password with human-like typing
+	fmt.Println("⌨️ Typing password...")
+	passwordInput := page.MustElement(`input#password`)
+	passwordInput.MustWaitVisible()
+	passwordInput.MustFocus()
+	humanize.SleepMillis(300, 500)
+	err = humanize.TypeCredential(passwordInput, password)
+	if err != nil {
+		return fmt.Errorf("failed to type password: %w", err)
+	}
+	humanize.Sleep(1, 2) // Pause before clicking submit
 
-	// page.MustElement(`input#rememberMeOptIn-checkbox`).MustClick()
-
+	// Click submit
 	page.MustElement(`button[type="submit"]`).MustClick()
 
 	page.MustWaitLoad()
-	time.Sleep(3 * time.Second)
+	humanize.Sleep(2, 4) // Wait for login to process
 
 	currentURL := page.MustInfo().URL
 
-	//login failure handling
-
+	// Login failure handling
 	if strings.Contains(currentURL, "/checkpoint") {
 		return fmt.Errorf("checkpoint detected (captcha or 2FA required)")
 	}

@@ -33,6 +33,7 @@ Thumbs.db
 
 # Sensitive data
 cookies.json
+stealth_config.json
 .env
 *.env
 

@@ -78,10 +78,17 @@ func SendMessage(page *rod.Page, content string, dryRun bool) error {
 	return nil
 }
 
-// typeMessage types content into the message input
+// typeMessage types content into the message input using human-like typing
+//
+// WHY HUMAN-LIKE TYPING MATTERS:
+// - LinkedIn monitors keystroke patterns and timing
+// - Instant text paste (innerHTML = "...") has ZERO keystroke events
+// - This is an obvious bot signal: "200 characters appeared in 0ms"
+// - Human typing generates keydown/keypress/input/keyup events
+// - Natural timing varies: faster for common letters, slower for symbols
 func typeMessage(page *rod.Page, content string) error {
-	result := page.MustEval(`(content) => {
-		// Message input selectors
+	// First, find and focus the message input
+	result := page.MustEval(`() => {
 		const inputSelectors = [
 			'div[role="textbox"][contenteditable="true"]',
 			'div.msg-form__contenteditable',
@@ -93,25 +100,30 @@ func typeMessage(page *rod.Page, content string) error {
 			const input = document.querySelector(selector);
 			if (input) {
 				input.focus();
-				
 				// Clear existing content
 				if (input.tagName === 'TEXTAREA') {
-					input.value = content;
+					input.value = '';
 				} else {
-					input.innerHTML = content;
+					input.innerHTML = '';
 				}
-				
-				// Trigger input event
-				input.dispatchEvent(new InputEvent('input', { bubbles: true }));
-				return true;
+				return { found: true, selector: selector };
 			}
 		}
 
-		return false;
-	}`, content)
+		return { found: false };
+	}`)
 
-	if !result.Bool() {
+	if !result.Get("found").Bool() {
 		return fmt.Errorf("message input not found")
+	}
+
+	humanize.SleepMillis(200, 400)
+
+	// Type the message character by character with human-like timing
+	fmt.Printf("⌨️ Typing message (%d chars)...\n", len(content))
+	err := humanize.TypeTextJS(page, content, humanize.DefaultTypingConfig())
+	if err != nil {
+		return fmt.Errorf("failed to type message: %w", err)
 	}
 
 	humanize.SleepMillis(400, 700)
