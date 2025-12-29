@@ -1,45 +1,3 @@
-// package search
-
-// import (
-// 	"fmt"
-// 	"time"
-
-// 	"github.com/go-rod/rod"
-// )
-
-// // ClickNextPage clicks LinkedIn pagination "Next" button
-
-// func ClickNextPage(page *rod.Page) (bool, error) {
-// 	fmt.Println("DEBUG: Looking for Next button via JS")
-
-// 	ok := page.MustEval(`() => {
-// 	const selectors = [
-// 		'button[data-testid="pagination-controls-next-button"]',
-// 		'button[aria-label="Next"]',
-// 	];
-
-// 	for (const selector of selectors) {
-// 		const btn = document.querySelector(selector);
-// 		if (!btn) continue;
-// 		if (btn.disabled) return false;
-// 		btn.scrollIntoView({ block: "center" });
-// 		btn.click();
-// 		return true;
-// 	}
-
-// 	return false;
-// }`).Bool()
-
-// 	if !ok {
-// 		fmt.Println("ℹ️ No Next button found or disabled, stopping")
-// 		return false, nil
-// 	}
-
-// 	fmt.Println("➡️ Clicking Next page")
-// 	time.Sleep(5 * time.Second) // React re-render
-// 	return true, nil
-// }
-
 package search
 
 import (
@@ -66,8 +24,22 @@ func ClickNextPage(page *rod.Page) (bool, error) {
 
 	// Execute JavaScript to find and click the Next button
 	result := page.MustEval(`() => {
-		// Debug: log all pagination-related elements
-		const debugInfo = [];
+		// Check for LinkedIn search limit message first
+		const pageText = document.body.innerText || '';
+		const limitPhrases = [
+			"reached the monthly limit",
+			"reached your monthly limit",
+			"Upgrade to Premium",
+			"unlimited search",
+			"You've reached the",
+			"search limit"
+		];
+		
+		for (const phrase of limitPhrases) {
+			if (pageText.toLowerCase().includes(phrase.toLowerCase())) {
+				return { found: false, disabled: false, clicked: false, limitReached: true };
+			}
+		}
 		
 		// Extended selectors for both people and company search pages
 		const selectors = [
@@ -170,13 +142,20 @@ func ClickNextPage(page *rod.Page) (bool, error) {
 			}
 		}
 
-		return { found: false, disabled: false, clicked: false };
+		return { found: false, disabled: false, clicked: false, limitReached: false };
 	}`)
 
 	// Parse result using Get method for gson.JSON
 	found := result.Get("found").Bool()
 	disabled := result.Get("disabled").Bool()
 	clicked := result.Get("clicked").Bool()
+	limitReached := result.Get("limitReached").Bool()
+
+	// Check if LinkedIn search limit was reached
+	if limitReached {
+		fmt.Println("⚠️ LinkedIn monthly search limit reached - cannot continue pagination")
+		return false, nil
+	}
 
 	// No button found - end of results
 	if !found {

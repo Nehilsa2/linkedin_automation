@@ -68,8 +68,8 @@
 // 		time.Sleep(5 * time.Second)
 // 	}
 
-// 	return allLinks, nil
-// }
+//		return allLinks, nil
+//	}
 package search
 
 import (
@@ -114,29 +114,11 @@ func FindPeople(browser *rod.Browser, keyword string, maxPages int) ([]string, e
 
 		fmt.Printf("👤 Page %d → %d profiles\n", pageNum, pageLinks)
 
-		// Pagination decision (independent of profile count)
-		fmt.Println("finding the next button")
-		nextBtn, err := page.Element(
-			`[data-testid="pagination-controls-next-button-visible"]`,
-		)
-		if err != nil {
-			fmt.Println("ℹ️ No Next button found, stopping")
+		// Use shared pagination function
+		hasNext, _ := ClickNextPage(page)
+		if !hasNext {
 			break
 		}
-
-		if d, _ := nextBtn.Attribute("disabled"); d != nil {
-			fmt.Println("ℹ️ Next button disabled, stopping")
-			break
-		}
-
-		// Click Next
-		nextBtn.MustScrollIntoView()
-		time.Sleep(800 * time.Millisecond)
-
-		fmt.Println("➡️ Clicking Next page")
-		nextBtn.MustClick()
-
-		time.Sleep(5 * time.Second)
 	}
 
 	return allLinks, nil
