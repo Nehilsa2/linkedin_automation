@@ -1,75 +1,3 @@
-// package search
-
-// import (
-// 	"fmt"
-// 	"net/url"
-// 	"strings"
-// 	"time"
-
-// 	"github.com/go-rod/rod"
-// )
-
-// // FindPeople searches LinkedIn people results and paginates safely
-// func FindPeople(browser *rod.Browser, keyword string, maxPages int) ([]string, error) {
-
-// 	searchURL := "https://www.linkedin.com/search/results/people/?keywords=" +
-// 		url.QueryEscape(keyword)
-
-// 	page := browser.MustPage(searchURL)
-// 	time.Sleep(4 * time.Second) // allow initial render
-
-// 	var allLinks []string
-// 	seen := make(map[string]bool)
-
-// 	for pageNum := 1; pageNum <= maxPages; pageNum++ {
-
-// 		// 🔍 Extract visible profile links (NO blocking waits)
-// 		anchors, _ := page.Elements(`a[href^="https://www.linkedin.com/in/"]`)
-// 		pageLinks := 0
-
-// 		for _, a := range anchors {
-// 			href, _ := a.Attribute("href")
-// 			if href == nil {
-// 				continue
-// 			}
-
-// 			link := strings.Split(*href, "?")[0]
-// 			if !seen[link] {
-// 				seen[link] = true
-// 				allLinks = append(allLinks, link)
-// 				pageLinks++
-// 			}
-// 		}
-
-// 		fmt.Printf("👤 Page %d → %d profiles\n", pageNum, pageLinks)
-
-// 		// 🔚 Try to paginate
-// 		nextBtn, err := page.Element(
-// 			`button[data-testid="pagination-controls-next-button"]`,
-// 		)
-// 		if err != nil {
-// 			fmt.Println("ℹ️ No Next button found, stopping")
-// 			break
-// 		}
-
-// 		if d, _ := nextBtn.Attribute("disabled"); d != nil {
-// 			fmt.Println("ℹ️ Next button disabled, stopping")
-// 			break
-// 		}
-
-// 		// Scroll + click (React-safe)
-// 		nextBtn.MustScrollIntoView()
-// 		time.Sleep(800 * time.Millisecond)
-
-// 		fmt.Println("➡️ Clicking Next page")
-// 		nextBtn.MustClick()
-
-// 		// React re-render (not navigation)
-// 		time.Sleep(5 * time.Second)
-// 	}
-
-//		return allLinks, nil
-//	}
 package search
 
 import (
@@ -79,7 +7,7 @@ import (
 
 	"github.com/go-rod/rod"
 
-	"github.com/Nehilsa2/linkedin_automation/humanize"
+	"github.com/Nehilsa2/linkedin_automation/stealth"
 )
 
 func FindPeople(browser *rod.Browser, keyword string, maxPages int) ([]string, error) {
@@ -88,7 +16,16 @@ func FindPeople(browser *rod.Browser, keyword string, maxPages int) ([]string, e
 		url.QueryEscape(keyword)
 
 	page := browser.MustPage(searchURL)
-	humanize.Sleep(3, 5) // Random initial page load
+	stealth.Sleep(3, 5) // Random initial page load
+
+	// Check for LinkedIn errors on initial load
+	result := stealth.CheckPage(page)
+	if result.HasError {
+		stealth.PrintDetectionStatus(result)
+		if !result.Error.Recoverable {
+			return nil, result.Error
+		}
+	}
 
 	var allLinks []string
 	seen := make(map[string]bool)

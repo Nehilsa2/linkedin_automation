@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-rod/rod"
 
-	"github.com/Nehilsa2/linkedin_automation/humanize"
+	"github.com/Nehilsa2/linkedin_automation/stealth"
 )
 
 // ClickNextPage clicks LinkedIn pagination "Next" button
@@ -21,10 +21,10 @@ func ClickNextPage(page *rod.Page) (bool, error) {
 	defer page.CancelTimeout()
 
 	// Human-like scroll to bottom to ensure pagination is loaded
-	humanize.ScrollDown(page)
-	humanize.SleepMillis(500, 1000)
-	humanize.ScrollDown(page)
-	humanize.SleepMillis(300, 600)
+	stealth.ScrollDown(page)
+	stealth.SleepMillis(500, 1000)
+	stealth.ScrollDown(page)
+	stealth.SleepMillis(300, 600)
 
 	// Execute JavaScript to find and click the Next button
 	result := page.MustEval(`() => {
@@ -180,7 +180,7 @@ func ClickNextPage(page *rod.Page) (bool, error) {
 
 	// Success
 	fmt.Println("✅ Clicked Next button")
-	humanize.Sleep(2, 4) // Random wait for page to load
+	stealth.Sleep(2, 4) // Random wait for page to load
 	page.MustWaitStable()
 
 	return true, nil

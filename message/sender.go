@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-rod/rod"
 
-	"github.com/Nehilsa2/linkedin_automation/humanize"
+	"github.com/Nehilsa2/linkedin_automation/stealth"
 )
 
 // SendMessage sends a message to a profile (must be on their profile page or in messaging)
@@ -60,7 +60,14 @@ func SendMessage(page *rod.Page, content string, dryRun bool) error {
 	}
 
 	// Wait for message modal/conversation to open
-	humanize.Sleep(1, 3)
+	stealth.Sleep(1, 3)
+
+	// Check for any errors after opening message modal
+	detectionResult := stealth.CheckPage(timeoutPage)
+	if detectionResult.HasError {
+		stealth.PrintDetectionStatus(detectionResult)
+		return detectionResult.Error
+	}
 
 	// Type the message
 	err := typeMessage(timeoutPage, content)
@@ -117,22 +124,22 @@ func typeMessage(page *rod.Page, content string) error {
 		return fmt.Errorf("message input not found")
 	}
 
-	humanize.SleepMillis(200, 400)
+	stealth.SleepMillis(200, 400)
 
 	// Type the message character by character with human-like timing
 	fmt.Printf("⌨️ Typing message (%d chars)...\n", len(content))
-	err := humanize.TypeTextJS(page, content, humanize.DefaultTypingConfig())
+	err := stealth.TypeTextJS(page, content, stealth.DefaultTypingConfig())
 	if err != nil {
 		return fmt.Errorf("failed to type message: %w", err)
 	}
 
-	humanize.SleepMillis(400, 700)
+	stealth.SleepMillis(400, 700)
 	return nil
 }
 
 // clickSendMessage clicks the send button
 func clickSendMessage(page *rod.Page) error {
-	humanize.SleepMillis(400, 700)
+	stealth.SleepMillis(400, 700)
 
 	result := page.MustEval(`() => {
 		const sendSelectors = [
@@ -167,7 +174,7 @@ func clickSendMessage(page *rod.Page) error {
 		return fmt.Errorf("send button not found or disabled")
 	}
 
-	humanize.SleepMillis(800, 1500)
+	stealth.SleepMillis(800, 1500)
 	return nil
 }
 
@@ -201,7 +208,7 @@ func SendFollowUpMessage(page *rod.Page, conn Connection, content string, tracke
 		fmt.Println("⚠️ Page stability wait timed out, continuing...")
 	}
 
-	humanize.Sleep(1, 3)
+	stealth.Sleep(1, 3)
 
 	// Send the message
 	err = SendMessage(page, content, tracker.DryRun)
@@ -263,7 +270,20 @@ func BatchFollowUp(page *rod.Page, connections []Connection, templateName string
 	successCount := 0
 	failCount := 0
 
+	// Get rate limiter for messaging
+	rateLimiter := stealth.GetRateLimiter()
+	rateLimiter.PrintStats(stealth.ActionMessage)
+
 	for i, conn := range connections {
+		// Check rate limits first
+		if can, reason := rateLimiter.CanPerform(stealth.ActionMessage); !can {
+			fmt.Printf("⏸️ Rate limited: %s\n", reason)
+			if !rateLimiter.WaitForAction(stealth.ActionMessage) {
+				fmt.Println("⏰ Rate limit wait too long - stopping batch")
+				break
+			}
+		}
+
 		if !tracker.CanSendMore() {
 			fmt.Printf("⚠️ Daily limit reached after %d messages\n", successCount)
 			break
@@ -282,13 +302,20 @@ func BatchFollowUp(page *rod.Page, connections []Connection, templateName string
 			failCount++
 		} else {
 			successCount++
+			// Record action for rate limiting
+			rateLimiter.RecordAction(stealth.ActionMessage)
 		}
 
-		// Randomized delay between messages (human-like)
+		// Use rate limiter's recommended delay
 		if i < len(connections)-1 && tracker.CanSendMore() {
-			humanize.Sleep(delayMinSec, delayMaxSec)
+			delay := rateLimiter.GetRecommendedDelay(stealth.ActionMessage)
+			fmt.Printf("⏳ Waiting %v before next message...\n", delay.Round(time.Second))
+			time.Sleep(delay)
 		}
 	}
+
+	// Print final stats
+	rateLimiter.PrintStats(stealth.ActionMessage)
 
 	return successCount, failCount, nil
 }

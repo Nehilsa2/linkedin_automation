@@ -9,8 +9,8 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/Nehilsa2/linkedin_automation/auth"
-	"github.com/Nehilsa2/linkedin_automation/humanize"
 	"github.com/Nehilsa2/linkedin_automation/persistence"
+	"github.com/Nehilsa2/linkedin_automation/stealth"
 )
 
 // Configuration - Set these to control which workflows run
@@ -56,7 +56,7 @@ func main() {
 
 	// ==================== SCHEDULE CHECK ====================
 	if EnforceSchedule {
-		scheduler := humanize.NewScheduler()
+		scheduler := stealth.NewScheduler()
 		fmt.Println("📅 Schedule status:", scheduler.GetStatus())
 
 		if !scheduler.CanOperate() {

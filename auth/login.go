@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-rod/rod"
 
-	"github.com/Nehilsa2/linkedin_automation/humanize"
+	"github.com/Nehilsa2/linkedin_automation/stealth"
 )
 
 // Login to linkedin using credentials
@@ -30,37 +30,37 @@ func Login(browser *rod.Browser) error {
 	// Login page
 	page := browser.MustPage("https://www.linkedin.com/login")
 	page.MustWaitLoad()
-	humanize.Sleep(2, 3) // Wait for page to fully render
+	stealth.Sleep(2, 3) // Wait for page to fully render
 
 	// Wait for email input to be ready
 	fmt.Println("⌨️ Typing email...")
 	emailInput := page.MustElement(`input#username`)
 	emailInput.MustWaitVisible()
 	emailInput.MustFocus()
-	humanize.SleepMillis(300, 500) // Pause before typing
-	err := humanize.TypeCredential(emailInput, email)
+	stealth.SleepMillis(300, 500) // Pause before typing
+	err := stealth.TypeCredential(emailInput, email)
 	if err != nil {
 		return fmt.Errorf("failed to type email: %w", err)
 	}
-	humanize.Sleep(1, 2) // Pause between fields (like a human tabbing)
+	stealth.Sleep(1, 2) // Pause between fields (like a human tabbing)
 
 	// Fill password with human-like typing
 	fmt.Println("⌨️ Typing password...")
 	passwordInput := page.MustElement(`input#password`)
 	passwordInput.MustWaitVisible()
 	passwordInput.MustFocus()
-	humanize.SleepMillis(300, 500)
-	err = humanize.TypeCredential(passwordInput, password)
+	stealth.SleepMillis(300, 500)
+	err = stealth.TypeCredential(passwordInput, password)
 	if err != nil {
 		return fmt.Errorf("failed to type password: %w", err)
 	}
-	humanize.Sleep(1, 2) // Pause before clicking submit
+	stealth.Sleep(1, 2) // Pause before clicking submit
 
 	// Click submit
 	page.MustElement(`button[type="submit"]`).MustClick()
 
 	page.MustWaitLoad()
-	humanize.Sleep(2, 4) // Wait for login to process
+	stealth.Sleep(2, 4) // Wait for login to process
 
 	currentURL := page.MustInfo().URL
 

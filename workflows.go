@@ -8,10 +8,10 @@ import (
 	"github.com/go-rod/rod"
 
 	"github.com/Nehilsa2/linkedin_automation/connect"
-	"github.com/Nehilsa2/linkedin_automation/humanize"
 	"github.com/Nehilsa2/linkedin_automation/message"
 	"github.com/Nehilsa2/linkedin_automation/persistence"
 	"github.com/Nehilsa2/linkedin_automation/search"
+	"github.com/Nehilsa2/linkedin_automation/stealth"
 )
 
 // RunSearch searches for people and companies on LinkedIn
@@ -216,13 +216,28 @@ func RunConnections(browser *rod.Browser, profileURLs []string) {
 	failCount := 0
 
 	// Create scheduler for break management
-	var scheduler *humanize.Scheduler
+	var scheduler *stealth.Scheduler
 	if EnforceSchedule {
-		scheduler = humanize.NewScheduler()
+		scheduler = stealth.NewScheduler()
 		scheduler.StartBurst()
 	}
 
+	// Get rate limiter for connection requests
+	rateLimiter := stealth.GetRateLimiter()
+	rateLimiter.PrintStats(stealth.ActionConnection)
+
 	for i, profileURL := range profileURLs[:maxRequests] {
+		// Check rate limits first
+		if can, reason := rateLimiter.CanPerform(stealth.ActionConnection); !can {
+			fmt.Printf("⏸️ Rate limited: %s\n", reason)
+			if !rateLimiter.WaitForAction(stealth.ActionConnection) {
+				fmt.Println("⏰ Rate limit wait too long - stopping workflow")
+				workflowState.Status = persistence.WorkflowStatusPaused
+				store.PauseWorkflow(workflowState.ID)
+				break
+			}
+		}
+
 		// Check schedule before each action
 		if EnforceSchedule && scheduler != nil {
 			if !scheduler.CanOperate() {
@@ -261,8 +276,25 @@ func RunConnections(browser *rod.Browser, profileURLs []string) {
 		if err != nil {
 			fmt.Printf("❌ Failed: %v\n", err)
 			failCount++
+
+			// Check if this is a critical LinkedIn error
+			if stealth.IsCritical(err) {
+				fmt.Println("🛑 Critical error detected - stopping workflow")
+				workflowState.Status = persistence.WorkflowStatusPaused
+				store.PauseWorkflow(workflowState.ID)
+				break
+			}
+
+			// For non-recoverable errors, may need longer cooldown
+			if !stealth.IsRecoverable(err) {
+				fmt.Println("⏸️ Non-recoverable error - taking extended break...")
+				stealth.Sleep(60, 120) // 1-2 minute break
+			}
 		} else {
 			successCount++
+
+			// Record action for rate limiting
+			rateLimiter.RecordAction(stealth.ActionConnection)
 
 			// Save to database
 			req := &persistence.ConnectionRequest{
@@ -281,11 +313,16 @@ func RunConnections(browser *rod.Browser, profileURLs []string) {
 			store.MarkSearchResultProcessed(profileURL)
 		}
 
-		// Randomized delay between requests (human-like)
+		// Use rate limiter's recommended delay (respects limits)
 		if i < maxRequests-1 {
-			humanize.Sleep(ConnectionDelayMin, ConnectionDelayMax)
+			delay := rateLimiter.GetRecommendedDelay(stealth.ActionConnection)
+			fmt.Printf("⏳ Waiting %v before next action...\n", delay.Round(time.Second))
+			time.Sleep(delay)
 		}
 	}
+
+	// Print final rate limit stats
+	rateLimiter.PrintStats(stealth.ActionConnection)
 
 	// Mark workflow complete
 	store.CompleteWorkflow(workflowState.ID)

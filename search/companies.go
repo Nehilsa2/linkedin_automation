@@ -4,25 +4,30 @@ import (
 	"fmt"
 
 	"github.com/go-rod/rod"
+
+	"github.com/Nehilsa2/linkedin_automation/stealth"
 )
 
 func FindCompanies(browser *rod.Browser, keyword string, maxPages int) ([]string, error) {
 
 	page, err := OpenSearchPage(browser, "companies", keyword, 1)
 	if err != nil {
-		return nil, err
+		// Check if error is recoverable
+		if linkedInErr, ok := err.(*stealth.LinkedInError); ok && !linkedInErr.Recoverable {
+			return nil, err
+		}
 	}
 
 	var allLinks []string
 	seen := make(map[string]bool)
 
 	for pageNum := 1; pageNum <= maxPages; pageNum++ {
-		fmt.Println("DEBUG: waiting for company results")
+		fmt.Println("waiting for company results")
 		page.MustWaitElementsMoreThan(
 			`div[data-view-name="search-entity-result-universal-template"]`,
 			0,
 		)
-		fmt.Println("DEBUG: company results appeared")
+		fmt.Println("company results appeared")
 
 		// Human-like browsing: scroll through results naturally
 		scrollAndBrowse(page)

@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-rod/rod"
 
-	"github.com/Nehilsa2/linkedin_automation/humanize"
+	"github.com/Nehilsa2/linkedin_automation/stealth"
 )
 
 const (
@@ -135,9 +135,16 @@ func NavigateToProfile(page *rod.Page, profileURL string) error {
 		fmt.Println("⚠️ Page stability wait timed out, continuing anyway...")
 	}
 
-	humanize.Sleep(1, 3) // Random delay after page load
-	fmt.Println("✅ Profile page loaded")
+	stealth.Sleep(1, 3) // Random delay after page load
 
+	// Check for LinkedIn errors after navigation
+	result := stealth.CheckPage(page)
+	if result.HasError {
+		stealth.PrintDetectionStatus(result)
+		return result.Error
+	}
+
+	fmt.Println("✅ Profile page loaded")
 	return nil
 }
 
@@ -214,7 +221,14 @@ func SendConnectionRequest(page *rod.Page, note string) error {
 	}
 
 	// Wait for modal to appear
-	humanize.SleepMillis(800, 1500)
+	stealth.SleepMillis(800, 1500)
+
+	// Check for any error responses after clicking connect
+	detectionResult := stealth.QuickCheck(page)
+	if detectionResult.HasError {
+		stealth.PrintDetectionStatus(detectionResult)
+		return detectionResult.Error
+	}
 
 	// Handle the connection modal
 	if note != "" {
@@ -282,7 +296,7 @@ func clickAddNote(page *rod.Page) error {
 		return fmt.Errorf("add note button not found")
 	}
 
-	humanize.SleepMillis(400, 700)
+	stealth.SleepMillis(400, 700)
 	return nil
 }
 
@@ -319,7 +333,7 @@ func typeNote(page *rod.Page, note string) error {
 
 // clickSendButton clicks the Send/Connect button in the modal
 func clickSendButton(page *rod.Page) error {
-	humanize.SleepMillis(400, 700)
+	stealth.SleepMillis(400, 700)
 
 	result := page.MustEval(`() => {
 		const selectors = [
@@ -369,7 +383,7 @@ func clickSendButton(page *rod.Page) error {
 		return fmt.Errorf("send button not found or disabled")
 	}
 
-	humanize.SleepMillis(800, 1500)
+	stealth.SleepMillis(800, 1500)
 	return nil
 
 }
@@ -466,7 +480,7 @@ func BatchConnect(page *rod.Page, profiles []string, noteTemplate string, tracke
 
 		// Randomized delay between requests (human-like)
 		if i < len(profiles)-1 && tracker.CanSendMore() {
-			humanize.Sleep(delaySeconds-2, delaySeconds+5) // Vary around the base delay
+			stealth.Sleep(delaySeconds-2, delaySeconds+5) // Vary around the base delay
 		}
 	}
 

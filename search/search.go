@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-rod/rod"
 
-	"github.com/Nehilsa2/linkedin_automation/humanize"
+	"github.com/Nehilsa2/linkedin_automation/stealth"
 )
 
 func OpenSearchPage(browser *rod.Browser, searchType, keyword string, pageNum int) (*rod.Page, error) {
@@ -25,7 +25,14 @@ func OpenSearchPage(browser *rod.Browser, searchType, keyword string, pageNum in
 
 	page := browser.MustPage(searchURL)
 	page.MustWaitLoad()
-	humanize.Sleep(2, 4) // Random page load delay
+	stealth.Sleep(2, 4) // Random page load delay
+
+	// Check for LinkedIn errors after loading search page
+	result := stealth.CheckPage(page)
+	if result.HasError {
+		stealth.PrintDetectionStatus(result)
+		return page, result.Error
+	}
 
 	return page, nil
 }
