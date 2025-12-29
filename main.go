@@ -9,6 +9,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/Nehilsa2/linkedin_automation/auth"
+	"github.com/Nehilsa2/linkedin_automation/humanize"
 	"github.com/Nehilsa2/linkedin_automation/persistence"
 )
 
@@ -21,6 +22,9 @@ const (
 
 	// Dry run mode (set to false to perform real actions)
 	DryRunMode = true
+
+	// Schedule enforcement (set to false to ignore work hours)
+	EnforceSchedule = true
 
 	// Search settings
 	SearchKeywordPeople    = "software engineer"
@@ -48,6 +52,23 @@ var store *persistence.Store
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("⚠️ Unable to load .env file; falling back to existing environment variables")
+	}
+
+	// ==================== SCHEDULE CHECK ====================
+	if EnforceSchedule {
+		scheduler := humanize.NewScheduler()
+		fmt.Println("📅 Schedule status:", scheduler.GetStatus())
+
+		if !scheduler.CanOperate() {
+			fmt.Println("⏰ Outside work hours or on break")
+			if !scheduler.WaitUntilCanOperate() {
+				fmt.Println("🌙 Work day ended - exiting")
+				return
+			}
+		}
+
+		// Start activity burst
+		scheduler.StartBurst()
 	}
 
 	// Initialize persistence store

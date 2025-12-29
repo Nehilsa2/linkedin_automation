@@ -215,7 +215,35 @@ func RunConnections(browser *rod.Browser, profileURLs []string) {
 	successCount := 0
 	failCount := 0
 
+	// Create scheduler for break management
+	var scheduler *humanize.Scheduler
+	if EnforceSchedule {
+		scheduler = humanize.NewScheduler()
+		scheduler.StartBurst()
+	}
+
 	for i, profileURL := range profileURLs[:maxRequests] {
+		// Check schedule before each action
+		if EnforceSchedule && scheduler != nil {
+			if !scheduler.CanOperate() {
+				fmt.Println("⏰ Work hours ended or on break - pausing workflow")
+				workflowState.Status = persistence.WorkflowStatusPaused
+				store.PauseWorkflow(workflowState.ID)
+				break
+			}
+
+			// Check if we should take a break
+			if scheduler.ShouldTakeBreak() {
+				fmt.Println("☕ Taking a break...")
+				workflowState.Status = persistence.WorkflowStatusPaused
+				store.SaveWorkflowState(workflowState)
+				scheduler.TakeBreak()
+				scheduler.StartBurst()
+				workflowState.Status = persistence.WorkflowStatusInProgress
+				store.SaveWorkflowState(workflowState)
+			}
+		}
+
 		// Check if already sent (in database)
 		sent, _ := store.HasSentRequest(profileURL)
 		if sent {
