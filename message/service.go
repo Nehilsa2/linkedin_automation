@@ -63,8 +63,8 @@ func (ms *MessagingService) SendFollowUp(conn Connection, templateName string) e
 }
 
 // SendBatchFollowUps sends follow-up messages to multiple connections
-func (ms *MessagingService) SendBatchFollowUps(connections []Connection, templateName string, delaySeconds int) (int, int, error) {
-	return BatchFollowUp(ms.Page, connections, templateName, ms.Templates, ms.Tracker, delaySeconds)
+func (ms *MessagingService) SendBatchFollowUps(connections []Connection, templateName string, delayMinSec, delayMaxSec int) (int, int, error) {
+	return BatchFollowUp(ms.Page, connections, templateName, ms.Templates, ms.Tracker, delayMinSec, delayMaxSec)
 }
 
 // SendCustomMessage sends a custom message to a connection
@@ -105,7 +105,7 @@ func (ms *MessagingService) AddCustomTemplate(name, description, content string)
 }
 
 // AutoFollowUp automatically sends follow-ups to recent unmessaged connections
-func (ms *MessagingService) AutoFollowUp(templateName string, maxMessages int, delaySeconds int) (int, int, error) {
+func (ms *MessagingService) AutoFollowUp(templateName string, maxMessages int, delayMinSec, delayMaxSec int) (int, int, error) {
 	// Get unmessaged connections
 	unmessaged := ms.GetUnmessagedConnections()
 
@@ -120,13 +120,13 @@ func (ms *MessagingService) AutoFollowUp(templateName string, maxMessages int, d
 	}
 
 	fmt.Printf("📨 Starting auto follow-up for %d connections...\n", len(unmessaged))
-	return ms.SendBatchFollowUps(unmessaged, templateName, delaySeconds)
+	return ms.SendBatchFollowUps(unmessaged, templateName, delayMinSec, delayMaxSec)
 }
 
 // FullWorkflow runs the complete messaging workflow
 // 1. Detect new connections
 // 2. Send follow-up messages
-func (ms *MessagingService) FullWorkflow(templateName string, maxMessages int, delaySeconds int) error {
+func (ms *MessagingService) FullWorkflow(templateName string, maxMessages int, delayMinSec, delayMaxSec int) error {
 	fmt.Println("\n🚀 Starting Full Messaging Workflow...")
 
 	// Step 1: Sync new connections
@@ -143,7 +143,7 @@ func (ms *MessagingService) FullWorkflow(templateName string, maxMessages int, d
 
 	// Step 3: Send follow-ups
 	fmt.Println("\n📨 Step 2: Sending follow-up messages...")
-	success, failed, err := ms.AutoFollowUp(templateName, maxMessages, delaySeconds)
+	success, failed, err := ms.AutoFollowUp(templateName, maxMessages, delayMinSec, delayMaxSec)
 	if err != nil {
 		return err
 	}

@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/go-rod/rod"
+
+	"github.com/Nehilsa2/linkedin_automation/humanize"
 )
 
 const (
@@ -133,7 +135,7 @@ func NavigateToProfile(page *rod.Page, profileURL string) error {
 		fmt.Println("⚠️ Page stability wait timed out, continuing anyway...")
 	}
 
-	time.Sleep(2 * time.Second)
+	humanize.Sleep(1, 3) // Random delay after page load
 	fmt.Println("✅ Profile page loaded")
 
 	return nil
@@ -212,7 +214,7 @@ func SendConnectionRequest(page *rod.Page, note string) error {
 	}
 
 	// Wait for modal to appear
-	time.Sleep(1 * time.Second)
+	humanize.SleepMillis(800, 1500)
 
 	// Handle the connection modal
 	if note != "" {
@@ -280,7 +282,7 @@ func clickAddNote(page *rod.Page) error {
 		return fmt.Errorf("add note button not found")
 	}
 
-	time.Sleep(500 * time.Millisecond)
+	humanize.SleepMillis(400, 700)
 	return nil
 }
 
@@ -317,7 +319,7 @@ func typeNote(page *rod.Page, note string) error {
 
 // clickSendButton clicks the Send/Connect button in the modal
 func clickSendButton(page *rod.Page) error {
-	time.Sleep(500 * time.Millisecond)
+	humanize.SleepMillis(400, 700)
 
 	result := page.MustEval(`() => {
 		const selectors = [
@@ -367,8 +369,9 @@ func clickSendButton(page *rod.Page) error {
 		return fmt.Errorf("send button not found or disabled")
 	}
 
-	time.Sleep(1 * time.Second)
+	humanize.SleepMillis(800, 1500)
 	return nil
+
 }
 
 // ConnectWithTracking sends a connection request and tracks it
@@ -461,10 +464,9 @@ func BatchConnect(page *rod.Page, profiles []string, noteTemplate string, tracke
 			successCount++
 		}
 
-		// Delay between requests to avoid rate limiting
+		// Randomized delay between requests (human-like)
 		if i < len(profiles)-1 && tracker.CanSendMore() {
-			fmt.Printf("⏳ Waiting %d seconds before next request...\n", delaySeconds)
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+			humanize.Sleep(delaySeconds-2, delaySeconds+5) // Vary around the base delay
 		}
 	}
 

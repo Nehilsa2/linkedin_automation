@@ -4,9 +4,10 @@ package search
 import (
 	"fmt"
 	"net/url"
-	"time"
 
 	"github.com/go-rod/rod"
+
+	"github.com/Nehilsa2/linkedin_automation/humanize"
 )
 
 func OpenSearchPage(browser *rod.Browser, searchType, keyword string, pageNum int) (*rod.Page, error) {
@@ -24,7 +25,7 @@ func OpenSearchPage(browser *rod.Browser, searchType, keyword string, pageNum in
 
 	page := browser.MustPage(searchURL)
 	page.MustWaitLoad()
-	time.Sleep(3 * time.Second)
+	humanize.Sleep(2, 4) // Random page load delay
 
 	return page, nil
 }

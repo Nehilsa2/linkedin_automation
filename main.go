@@ -29,12 +29,14 @@ const (
 
 	// Connection settings
 	MaxConnectionRequests = 3
-	ConnectionDelay       = 10 // seconds
+	ConnectionDelayMin    = 8  // seconds (randomized)
+	ConnectionDelayMax    = 15 // seconds (randomized)
 
 	// Messaging settings
 	MessageTemplate     = "follow_up_simple"
 	MaxFollowUpMessages = 3
-	MessageDelay        = 10 // seconds
+	MessageDelayMin     = 8  // seconds (randomized)
+	MessageDelayMax     = 15 // seconds (randomized)
 
 	// Database settings
 	DatabasePath = "linkedin_automation.db"

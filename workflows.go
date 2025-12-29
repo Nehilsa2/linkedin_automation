@@ -8,6 +8,7 @@ import (
 	"github.com/go-rod/rod"
 
 	"github.com/Nehilsa2/linkedin_automation/connect"
+	"github.com/Nehilsa2/linkedin_automation/humanize"
 	"github.com/Nehilsa2/linkedin_automation/message"
 	"github.com/Nehilsa2/linkedin_automation/persistence"
 	"github.com/Nehilsa2/linkedin_automation/search"
@@ -252,10 +253,9 @@ func RunConnections(browser *rod.Browser, profileURLs []string) {
 			store.MarkSearchResultProcessed(profileURL)
 		}
 
-		// Delay between requests
+		// Randomized delay between requests (human-like)
 		if i < maxRequests-1 {
-			fmt.Printf("⏳ Waiting %d seconds before next request...\n", ConnectionDelay)
-			time.Sleep(time.Duration(ConnectionDelay) * time.Second)
+			humanize.Sleep(ConnectionDelayMin, ConnectionDelayMax)
 		}
 	}
 
@@ -330,7 +330,8 @@ func RunMessaging(browser *rod.Browser) {
 	err = msgService.FullWorkflow(
 		MessageTemplate,
 		MaxFollowUpMessages,
-		MessageDelay,
+		MessageDelayMin,
+		MessageDelayMax,
 	)
 	if err != nil {
 		log.Printf("⚠️ Workflow error: %v\n", err)

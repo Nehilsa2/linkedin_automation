@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/go-rod/rod"
+
+	"github.com/Nehilsa2/linkedin_automation/humanize"
 )
 
 // SendMessage sends a message to a profile (must be on their profile page or in messaging)
@@ -58,7 +60,7 @@ func SendMessage(page *rod.Page, content string, dryRun bool) error {
 	}
 
 	// Wait for message modal/conversation to open
-	time.Sleep(2 * time.Second)
+	humanize.Sleep(1, 3)
 
 	// Type the message
 	err := typeMessage(timeoutPage, content)
@@ -112,13 +114,13 @@ func typeMessage(page *rod.Page, content string) error {
 		return fmt.Errorf("message input not found")
 	}
 
-	time.Sleep(500 * time.Millisecond)
+	humanize.SleepMillis(400, 700)
 	return nil
 }
 
 // clickSendMessage clicks the send button
 func clickSendMessage(page *rod.Page) error {
-	time.Sleep(500 * time.Millisecond)
+	humanize.SleepMillis(400, 700)
 
 	result := page.MustEval(`() => {
 		const sendSelectors = [
@@ -153,7 +155,7 @@ func clickSendMessage(page *rod.Page) error {
 		return fmt.Errorf("send button not found or disabled")
 	}
 
-	time.Sleep(1 * time.Second)
+	humanize.SleepMillis(800, 1500)
 	return nil
 }
 
@@ -187,7 +189,7 @@ func SendFollowUpMessage(page *rod.Page, conn Connection, content string, tracke
 		fmt.Println("⚠️ Page stability wait timed out, continuing...")
 	}
 
-	time.Sleep(2 * time.Second)
+	humanize.Sleep(1, 3)
 
 	// Send the message
 	err = SendMessage(page, content, tracker.DryRun)
@@ -245,7 +247,7 @@ func SendTemplatedFollowUp(page *rod.Page, conn Connection, templateName string,
 }
 
 // BatchFollowUp sends follow-up messages to multiple connections
-func BatchFollowUp(page *rod.Page, connections []Connection, templateName string, templates *TemplateManager, tracker *Tracker, delaySeconds int) (int, int, error) {
+func BatchFollowUp(page *rod.Page, connections []Connection, templateName string, templates *TemplateManager, tracker *Tracker, delayMinSec, delayMaxSec int) (int, int, error) {
 	successCount := 0
 	failCount := 0
 
@@ -270,10 +272,9 @@ func BatchFollowUp(page *rod.Page, connections []Connection, templateName string
 			successCount++
 		}
 
-		// Delay between messages
+		// Randomized delay between messages (human-like)
 		if i < len(connections)-1 && tracker.CanSendMore() {
-			fmt.Printf("⏳ Waiting %d seconds before next message...\n", delaySeconds)
-			time.Sleep(time.Duration(delaySeconds) * time.Second)
+			humanize.Sleep(delayMinSec, delayMaxSec)
 		}
 	}
 

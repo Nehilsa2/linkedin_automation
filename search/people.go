@@ -76,9 +76,10 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/go-rod/rod"
+
+	"github.com/Nehilsa2/linkedin_automation/humanize"
 )
 
 func FindPeople(browser *rod.Browser, keyword string, maxPages int) ([]string, error) {
@@ -87,7 +88,7 @@ func FindPeople(browser *rod.Browser, keyword string, maxPages int) ([]string, e
 		url.QueryEscape(keyword)
 
 	page := browser.MustPage(searchURL)
-	time.Sleep(4 * time.Second)
+	humanize.Sleep(3, 5) // Random initial page load
 
 	var allLinks []string
 	seen := make(map[string]bool)
