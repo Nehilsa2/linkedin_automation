@@ -8,6 +8,7 @@ import (
 	"github.com/go-rod/rod"
 
 	"github.com/Nehilsa2/linkedin_automation/humanize"
+	"github.com/Nehilsa2/linkedin_automation/stealth"
 )
 
 func OpenSearchPage(browser *rod.Browser, searchType, keyword string, pageNum int) (*rod.Page, error) {
@@ -24,6 +25,10 @@ func OpenSearchPage(browser *rod.Browser, searchType, keyword string, pageNum in
 	}
 
 	page := browser.MustPage(searchURL)
+
+	// Apply stealth scripts to mask automation fingerprints
+	stealth.ApplyStealthScripts(page)
+
 	page.MustWaitLoad()
 	humanize.Sleep(2, 4) // Random page load delay
 
