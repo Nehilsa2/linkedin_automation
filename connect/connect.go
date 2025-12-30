@@ -15,7 +15,7 @@ import (
 const (
 	// LinkedIn limits
 	MaxNoteLength     = 300
-	DefaultDailyLimit = 100
+	DefaultDailyLimit = 10
 
 	// Storage file for tracking
 	RequestsFile = "connection_requests.json"
