@@ -14,12 +14,16 @@ import (
 
 const (
 	// LinkedIn limits
-	MaxNoteLength     = 300
-	DefaultDailyLimit = 10
+	MaxNoteLength = 300
 
 	// Storage file for tracking
 	RequestsFile = "connection_requests.json"
 )
+
+// GetDefaultDailyLimit returns the daily limit from central config
+func GetDefaultDailyLimit() int {
+	return stealth.GetConnectionDailyLimit()
+}
 
 // ConnectionRequest represents a sent connection request
 type ConnectionRequest struct {
@@ -41,7 +45,7 @@ type ConnectionTracker struct {
 func LoadTracker() (*ConnectionTracker, error) {
 	tracker := &ConnectionTracker{
 		Requests:   []ConnectionRequest{},
-		DailyLimit: DefaultDailyLimit,
+		DailyLimit: stealth.GetConnectionDailyLimit(), // Use central config
 	}
 
 	data, err := os.ReadFile(RequestsFile)

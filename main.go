@@ -24,26 +24,26 @@ const (
 	DryRunMode = true
 
 	// Schedule enforcement (set to false to ignore work hours)
-	EnforceSchedule = true
+	EnforceSchedule = false // TEMPORARILY DISABLED FOR TESTING
 
 	// Search settings
 	SearchKeywordPeople    = "software engineer"
 	SearchKeywordCompanies = "fintech"
 	SearchMaxPages         = 2
 
-	// Connection settings
-	MaxConnectionRequests = 3
-	ConnectionDelayMin    = 8  // seconds (randomized)
-	ConnectionDelayMax    = 15 // seconds (randomized)
+	// Organic browsing settings
+	EnableOrganicBrowsing = true // Browse profiles/feed between connections
 
 	// Messaging settings
 	MessageTemplate     = "follow_up_simple"
 	MaxFollowUpMessages = 3
-	MessageDelayMin     = 8  // seconds (randomized)
-	MessageDelayMax     = 15 // seconds (randomized)
 
 	// Database settings
 	DatabasePath = "linkedin_automation.db"
+
+	// Safety level for rate limiting (all limits controlled from stealth/ratelimit.go)
+	// Options: SafetyUltraConservative, SafetyConservative, SafetyModerate, SafetyAggressive
+	DefaultSafetyLevel = stealth.SafetyConservative
 )
 
 // Global store instance
@@ -53,6 +53,11 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("⚠️ Unable to load .env file; falling back to existing environment variables")
 	}
+
+	// ==================== RATE LIMIT CONFIG ====================
+	// Initialize rate limiting with the chosen safety level
+	stealth.SetSafetyLevel(DefaultSafetyLevel)
+	stealth.PrintConfig()
 
 	// ==================== SCHEDULE CHECK ====================
 	if EnforceSchedule {
@@ -92,6 +97,7 @@ func main() {
 	// Only disables the webdriver flag - nothing else
 	u := launcher.New().
 		Set("disable-blink-features", "AutomationControlled").
+		Headless(false). // VISIBLE browser window
 		Leakless(false).
 		MustLaunch()
 
@@ -103,6 +109,16 @@ func main() {
 	if err != nil {
 		log.Fatal("❌ Authentication failed:", err)
 	}
+
+	// Use the authenticated feed page for organic browsing
+	pages, err := browser.Pages()
+	if err != nil || len(pages) == 0 {
+		log.Fatal("❌ Could not get feed page after authentication")
+	}
+	feedPage := pages[len(pages)-1]
+	organicBrowser := stealth.NewOrganicBrowser(feedPage)
+	organicBrowser.BrowseFeed()
+	organicBrowser.RandomDelay()
 
 	var people []string
 

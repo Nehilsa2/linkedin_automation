@@ -302,6 +302,25 @@ func GetRecentConnections(tracker *Tracker, days int) []Connection {
 	return recent
 }
 
+// GetConnectionsDaysAgo returns connections that were accepted exactly `daysAgo` days ago
+// and have not been messaged yet. `daysAgo=4` means connections accepted 4 days before today.
+func GetConnectionsDaysAgo(tracker *Tracker, daysAgo int) []Connection {
+	// Start of the target day
+	targetStart := time.Now().AddDate(0, 0, -daysAgo).Truncate(24 * time.Hour)
+	targetEnd := targetStart.Add(24 * time.Hour)
+
+	var results []Connection
+	for _, conn := range tracker.Connections {
+		if conn.HasMessaged {
+			continue
+		}
+		if conn.ConnectedAt.After(targetStart) && conn.ConnectedAt.Before(targetEnd) {
+			results = append(results, conn)
+		}
+	}
+	return results
+}
+
 // SyncNewConnections detects and adds new connections to tracker
 func SyncNewConnections(page *rod.Page, tracker *Tracker, maxToScan int) (int, error) {
 	newConns, err := DetectNewConnections(page, tracker, maxToScan)

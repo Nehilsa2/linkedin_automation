@@ -10,6 +10,311 @@ import (
 	"time"
 )
 
+// =============================================================================
+// SINGLE SOURCE OF TRUTH: All rate limits and throttling configuration
+// =============================================================================
+
+// SafetyLevel controls how aggressive the automation is
+type SafetyLevel string
+
+const (
+	SafetyUltraConservative SafetyLevel = "ultra_conservative" // For accounts at risk
+	SafetyConservative      SafetyLevel = "conservative"       // Recommended for main accounts
+	SafetyModerate          SafetyLevel = "moderate"           // For established accounts
+	SafetyAggressive        SafetyLevel = "aggressive"         // High risk - not recommended
+)
+
+// GlobalConfig holds all automation configuration - SINGLE SOURCE OF TRUTH
+type GlobalConfig struct {
+	// Safety level
+	SafetyLevel SafetyLevel `json:"safety_level"`
+
+	// Connection limits
+	ConnectionDailyLimit  int `json:"connection_daily_limit"`
+	ConnectionHourlyLimit int `json:"connection_hourly_limit"`
+	ConnectionDelayMin    int `json:"connection_delay_min_sec"` // seconds
+	ConnectionDelayMax    int `json:"connection_delay_max_sec"` // seconds
+
+	// Message limits
+	MessageDailyLimit  int `json:"message_daily_limit"`
+	MessageHourlyLimit int `json:"message_hourly_limit"`
+	MessageDelayMin    int `json:"message_delay_min_sec"` // seconds
+	MessageDelayMax    int `json:"message_delay_max_sec"` // seconds
+
+	// Search limits
+	SearchDailyLimit  int `json:"search_daily_limit"`
+	SearchHourlyLimit int `json:"search_hourly_limit"`
+	SearchDelayMin    int `json:"search_delay_min_sec"` // seconds
+	SearchDelayMax    int `json:"search_delay_max_sec"` // seconds
+
+	// Burst settings
+	BurstLimit    int `json:"burst_limit"`        // Actions before forced cooldown
+	BurstCooldown int `json:"burst_cooldown_sec"` // Cooldown after burst (seconds)
+
+	// Session settings
+	MaxSessionDuration int `json:"max_session_duration_min"` // Max runtime in minutes
+	BreakAfterActions  int `json:"break_after_actions"`      // Take break after N actions
+	BreakDurationMin   int `json:"break_duration_min_sec"`   // Min break length (seconds)
+	BreakDurationMax   int `json:"break_duration_max_sec"`   // Max break length (seconds)
+}
+
+// Pre-defined safety configurations
+var safetyConfigs = map[SafetyLevel]*GlobalConfig{
+	SafetyUltraConservative: {
+		SafetyLevel:           SafetyUltraConservative,
+		ConnectionDailyLimit:  5,
+		ConnectionHourlyLimit: 2,
+		ConnectionDelayMin:    60,  // 1 minute minimum
+		ConnectionDelayMax:    180, // 3 minutes maximum
+		MessageDailyLimit:     3,
+		MessageHourlyLimit:    1,
+		MessageDelayMin:       45,
+		MessageDelayMax:       120,
+		SearchDailyLimit:      10,
+		SearchHourlyLimit:     3,
+		SearchDelayMin:        10,
+		SearchDelayMax:        30,
+		BurstLimit:            3,
+		BurstCooldown:         600, // 10 min cooldown
+		MaxSessionDuration:    60,  // 1 hour max
+		BreakAfterActions:     5,
+		BreakDurationMin:      120,
+		BreakDurationMax:      300,
+	},
+	SafetyConservative: {
+		SafetyLevel:           SafetyConservative,
+		ConnectionDailyLimit:  10,
+		ConnectionHourlyLimit: 3,
+		ConnectionDelayMin:    30, //sec
+		ConnectionDelayMax:    90, //sec
+		MessageDailyLimit:     3,
+		MessageHourlyLimit:    1,
+		MessageDelayMin:       30,
+		MessageDelayMax:       60,
+		SearchDailyLimit:      15,
+		SearchHourlyLimit:     5,
+		SearchDelayMin:        5,
+		SearchDelayMax:        20,
+		BurstLimit:            5,
+		BurstCooldown:         300, // 5 min cooldown
+		MaxSessionDuration:    90,  // 1.5 hours max
+		BreakAfterActions:     8,
+		BreakDurationMin:      60,
+		BreakDurationMax:      180,
+	},
+	SafetyModerate: {
+		SafetyLevel:           SafetyModerate,
+		ConnectionDailyLimit:  15,
+		ConnectionHourlyLimit: 4,
+		ConnectionDelayMin:    20,
+		ConnectionDelayMax:    60,
+		MessageDailyLimit:     8,
+		MessageHourlyLimit:    3,
+		MessageDelayMin:       20,
+		MessageDelayMax:       45,
+		SearchDailyLimit:      20,
+		SearchHourlyLimit:     6,
+		SearchDelayMin:        3,
+		SearchDelayMax:        15,
+		BurstLimit:            8,
+		BurstCooldown:         180, // 3 min cooldown
+		MaxSessionDuration:    120, // 2 hours max
+		BreakAfterActions:     12,
+		BreakDurationMin:      30,
+		BreakDurationMax:      90,
+	},
+	SafetyAggressive: {
+		SafetyLevel:           SafetyAggressive,
+		ConnectionDailyLimit:  25,
+		ConnectionHourlyLimit: 6,
+		ConnectionDelayMin:    10,
+		ConnectionDelayMax:    30,
+		MessageDailyLimit:     10,
+		MessageHourlyLimit:    5,
+		MessageDelayMin:       10,
+		MessageDelayMax:       30,
+		SearchDailyLimit:      30,
+		SearchHourlyLimit:     10,
+		SearchDelayMin:        2,
+		SearchDelayMax:        10,
+		BurstLimit:            12,
+		BurstCooldown:         120, // 2 min cooldown
+		MaxSessionDuration:    180, // 3 hours max
+		BreakAfterActions:     20,
+		BreakDurationMin:      15,
+		BreakDurationMax:      45,
+	},
+}
+
+// Global configuration instance - SINGLETON
+var (
+	globalConfig     *GlobalConfig
+	globalConfigOnce sync.Once
+	globalConfigMu   sync.RWMutex
+	configFile       = "rate_config.json"
+)
+
+// GetConfig returns the global configuration (singleton)
+func GetConfig() *GlobalConfig {
+	globalConfigOnce.Do(func() {
+		// Try to load from file first
+		globalConfig = loadConfigFromFile()
+		if globalConfig == nil {
+			// Default to conservative
+			globalConfig = safetyConfigs[SafetyConservative].clone()
+		}
+		fmt.Printf("⚙️ Rate limiter initialized: %s mode\n", globalConfig.SafetyLevel)
+	})
+	return globalConfig
+}
+
+// SetSafetyLevel changes the global safety level
+func SetSafetyLevel(level SafetyLevel) {
+	globalConfigMu.Lock()
+	defer globalConfigMu.Unlock()
+
+	if cfg, exists := safetyConfigs[level]; exists {
+		globalConfig = cfg.clone()
+		saveConfigToFile(globalConfig)
+		fmt.Printf("⚙️ Safety level changed to: %s\n", level)
+	}
+}
+
+// clone creates a copy of the config
+func (c *GlobalConfig) clone() *GlobalConfig {
+	return &GlobalConfig{
+		SafetyLevel:           c.SafetyLevel,
+		ConnectionDailyLimit:  c.ConnectionDailyLimit,
+		ConnectionHourlyLimit: c.ConnectionHourlyLimit,
+		ConnectionDelayMin:    c.ConnectionDelayMin,
+		ConnectionDelayMax:    c.ConnectionDelayMax,
+		MessageDailyLimit:     c.MessageDailyLimit,
+		MessageHourlyLimit:    c.MessageHourlyLimit,
+		MessageDelayMin:       c.MessageDelayMin,
+		MessageDelayMax:       c.MessageDelayMax,
+		SearchDailyLimit:      c.SearchDailyLimit,
+		SearchHourlyLimit:     c.SearchHourlyLimit,
+		SearchDelayMin:        c.SearchDelayMin,
+		SearchDelayMax:        c.SearchDelayMax,
+		BurstLimit:            c.BurstLimit,
+		BurstCooldown:         c.BurstCooldown,
+		MaxSessionDuration:    c.MaxSessionDuration,
+		BreakAfterActions:     c.BreakAfterActions,
+		BreakDurationMin:      c.BreakDurationMin,
+		BreakDurationMax:      c.BreakDurationMax,
+	}
+}
+
+// =============================================================================
+// CONVENIENCE GETTERS - Use these throughout the codebase
+// =============================================================================
+
+// Connection getters
+func GetConnectionDailyLimit() int  { return GetConfig().ConnectionDailyLimit }
+func GetConnectionHourlyLimit() int { return GetConfig().ConnectionHourlyLimit }
+func GetConnectionDelayMin() int    { return GetConfig().ConnectionDelayMin }
+func GetConnectionDelayMax() int    { return GetConfig().ConnectionDelayMax }
+
+// Message getters
+func GetMessageDailyLimit() int  { return GetConfig().MessageDailyLimit }
+func GetMessageHourlyLimit() int { return GetConfig().MessageHourlyLimit }
+func GetMessageDelayMin() int    { return GetConfig().MessageDelayMin }
+func GetMessageDelayMax() int    { return GetConfig().MessageDelayMax }
+
+// Search getters
+func GetSearchDailyLimit() int  { return GetConfig().SearchDailyLimit }
+func GetSearchHourlyLimit() int { return GetConfig().SearchHourlyLimit }
+func GetSearchDelayMin() int    { return GetConfig().SearchDelayMin }
+func GetSearchDelayMax() int    { return GetConfig().SearchDelayMax }
+
+// Burst/Break getters
+func GetBurstLimit() int        { return GetConfig().BurstLimit }
+func GetBurstCooldown() int     { return GetConfig().BurstCooldown }
+func GetBreakAfterActions() int { return GetConfig().BreakAfterActions }
+func GetBreakDurationMin() int  { return GetConfig().BreakDurationMin }
+func GetBreakDurationMax() int  { return GetConfig().BreakDurationMax }
+
+// GetRandomDelay returns a random delay for the given action type
+func GetRandomDelay(action ActionType) time.Duration {
+	cfg := GetConfig()
+	var min, max int
+
+	switch action {
+	case ActionConnection:
+		min, max = cfg.ConnectionDelayMin, cfg.ConnectionDelayMax
+	case ActionMessage:
+		min, max = cfg.MessageDelayMin, cfg.MessageDelayMax
+	case ActionSearch:
+		min, max = cfg.SearchDelayMin, cfg.SearchDelayMax
+	default:
+		min, max = 5, 15
+	}
+
+	if min >= max {
+		return time.Duration(min) * time.Second
+	}
+	delay := min + rand.Intn(max-min+1)
+	return time.Duration(delay) * time.Second
+}
+
+// GetRandomBreakDuration returns a random break duration
+func GetRandomBreakDuration() time.Duration {
+	cfg := GetConfig()
+	min, max := cfg.BreakDurationMin, cfg.BreakDurationMax
+	if min >= max {
+		return time.Duration(min) * time.Second
+	}
+	duration := min + rand.Intn(max-min+1)
+	return time.Duration(duration) * time.Second
+}
+
+// PrintConfig prints the current configuration
+func PrintConfig() {
+	cfg := GetConfig()
+	fmt.Println("\n" + strings.Repeat("=", 50))
+	fmt.Printf("⚙️ RATE LIMIT CONFIGURATION (%s)\n", cfg.SafetyLevel)
+	fmt.Println(strings.Repeat("=", 50))
+	fmt.Printf("Connections: %d/day, %d/hour (delay: %d-%ds)\n",
+		cfg.ConnectionDailyLimit, cfg.ConnectionHourlyLimit,
+		cfg.ConnectionDelayMin, cfg.ConnectionDelayMax)
+	fmt.Printf("Messages:    %d/day, %d/hour (delay: %d-%ds)\n",
+		cfg.MessageDailyLimit, cfg.MessageHourlyLimit,
+		cfg.MessageDelayMin, cfg.MessageDelayMax)
+	fmt.Printf("Searches:    %d/day, %d/hour (delay: %d-%ds)\n",
+		cfg.SearchDailyLimit, cfg.SearchHourlyLimit,
+		cfg.SearchDelayMin, cfg.SearchDelayMax)
+	fmt.Printf("Burst: %d actions then %ds cooldown\n",
+		cfg.BurstLimit, cfg.BurstCooldown)
+	fmt.Printf("Breaks: every %d actions (%d-%ds)\n",
+		cfg.BreakAfterActions, cfg.BreakDurationMin, cfg.BreakDurationMax)
+	fmt.Println(strings.Repeat("=", 50))
+}
+
+// Config persistence
+func loadConfigFromFile() *GlobalConfig {
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		return nil
+	}
+	var cfg GlobalConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil
+	}
+	return &cfg
+}
+
+func saveConfigToFile(cfg *GlobalConfig) {
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return
+	}
+	os.WriteFile(configFile, data, 0644)
+}
+
+// =============================================================================
+// ACTION TYPES AND RATE LIMITER (uses GlobalConfig)
+// =============================================================================
+
 // ActionType represents different rate-limited actions
 type ActionType string
 
@@ -38,38 +343,39 @@ type RateLimitConfig struct {
 	BurstCooldown int `json:"burst_cooldown"` // Seconds to wait after burst
 }
 
-// DefaultLimits returns conservative limits for each action type
+// DefaultLimits returns limits based on GlobalConfig
 func DefaultLimits() map[ActionType]*RateLimitConfig {
+	cfg := GetConfig()
 	return map[ActionType]*RateLimitConfig{
 		ActionConnection: {
-			DailyLimit:         14, // LinkedIn's unofficial limit is ~100/week
-			HourlyLimit:        3,
-			MinIntervalSeconds: 30,
-			MaxIntervalSeconds: 120,
-			CooldownThreshold:  15,
-			CooldownDuration:   30,
-			BurstLimit:         5,
-			BurstCooldown:      300, // 5 min after 5 connections
+			DailyLimit:         cfg.ConnectionDailyLimit,
+			HourlyLimit:        cfg.ConnectionHourlyLimit,
+			MinIntervalSeconds: cfg.ConnectionDelayMin,
+			MaxIntervalSeconds: cfg.ConnectionDelayMax,
+			CooldownThreshold:  cfg.ConnectionDailyLimit,
+			CooldownDuration:   cfg.BurstCooldown / 60, // Convert to minutes
+			BurstLimit:         cfg.BurstLimit,
+			BurstCooldown:      cfg.BurstCooldown,
 		},
 		ActionMessage: {
-			DailyLimit:         20,
-			HourlyLimit:        4,
-			MinIntervalSeconds: 20,
-			MaxIntervalSeconds: 90,
-			CooldownThreshold:  20,
-			CooldownDuration:   20,
-			BurstLimit:         8,
-			BurstCooldown:      180, // 3 min after 8 messages
+			DailyLimit:         cfg.MessageDailyLimit,
+			HourlyLimit:        cfg.MessageHourlyLimit,
+			MinIntervalSeconds: cfg.MessageDelayMin,
+			MaxIntervalSeconds: cfg.MessageDelayMax,
+			CooldownThreshold:  cfg.MessageDailyLimit,
+			CooldownDuration:   cfg.BurstCooldown / 60,
+			BurstLimit:         cfg.BurstLimit,
+			BurstCooldown:      cfg.BurstCooldown,
 		},
 		ActionSearch: {
-			DailyLimit:         15, // LinkedIn limits searches
-			HourlyLimit:        5,
-			MinIntervalSeconds: 5,
-			MaxIntervalSeconds: 30,
-			CooldownThreshold:  10,
-			CooldownDuration:   10,
-			BurstLimit:         5,
-			BurstCooldown:      60,
+			DailyLimit:         cfg.SearchDailyLimit,
+			HourlyLimit:        cfg.SearchHourlyLimit,
+			MinIntervalSeconds: cfg.SearchDelayMin,
+			MaxIntervalSeconds: cfg.SearchDelayMax,
+			CooldownThreshold:  cfg.SearchDailyLimit,
+			CooldownDuration:   cfg.BurstCooldown / 60,
+			BurstLimit:         cfg.BurstLimit,
+			BurstCooldown:      cfg.BurstCooldown,
 		},
 	}
 }

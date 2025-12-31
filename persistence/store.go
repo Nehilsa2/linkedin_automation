@@ -254,3 +254,20 @@ func (s *Store) incrementDailyStat(field string) error {
 	_, err := s.db.Exec(query, getTodayDate())
 	return err
 }
+
+// Public methods to increment specific stats (for dry run mode tracking)
+
+// IncrementConnectionsSent increments the connections_sent counter
+func (s *Store) IncrementConnectionsSent() error {
+	return s.incrementDailyStat("connections_sent")
+}
+
+// IncrementMessagesSent increments the messages_sent counter
+func (s *Store) IncrementMessagesSent() error {
+	return s.incrementDailyStat("messages_sent")
+}
+
+// IncrementProfilesSearched increments the profiles_searched counter
+func (s *Store) IncrementProfilesSearched() error {
+	return s.incrementDailyStat("profiles_searched")
+}

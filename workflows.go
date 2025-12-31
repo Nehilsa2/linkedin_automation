@@ -45,13 +45,12 @@ func RunSearch(browser *rod.Browser) ([]string, []string) {
 	// Search for people
 	fmt.Printf("\n👤 Searching for people: %s\n", SearchKeywordPeople)
 	people, err := search.FindPeople(browser, SearchKeywordPeople, SearchMaxPages)
+	if len(people) > 0 {
+		fmt.Printf("✅ Found %d profiles\n", len(people))
+		savePeopleResultsToDB(people, SearchKeywordPeople)
+	}
 	if err != nil {
 		log.Printf("⚠️ People search error: %v\n", err)
-	} else {
-		fmt.Printf("✅ Found %d profiles\n", len(people))
-
-		// Save search results to database
-		savePeopleResultsToDB(people, SearchKeywordPeople)
 	}
 
 	workflowState.CurrentStep = "searching_companies"
@@ -132,10 +131,11 @@ func saveCompanyResultsToDB(urls []string, keyword string) {
 	}
 }
 
-// RunConnections sends connection requests to found profiles
+// RunConnections sends connection requests to found profiles with organic browsing
+// Flow: Browse random profile -> Feed -> Quick view target -> Connect
 func RunConnections(browser *rod.Browser, profileURLs []string) {
 	fmt.Println("\n==================================================")
-	fmt.Println("🔗 CONNECTION WORKFLOW")
+	fmt.Println("🔗 CONNECTION WORKFLOW (with organic browsing)")
 	fmt.Println("==================================================")
 
 	// Create workflow state
@@ -169,12 +169,12 @@ func RunConnections(browser *rod.Browser, profileURLs []string) {
 		return
 	}
 
-	// Set dry run mode
+	// Set dry run mode and safe daily limit from central config
 	tracker.SetDryRun(DryRunMode)
-	tracker.SetDailyLimit(50)
+	tracker.SetDailyLimit(stealth.GetConnectionDailyLimit())
 
 	// Print stats from database
-	connStats, err := store.GetConnectionRequestStats(50)
+	connStats, err := store.GetConnectionRequestStats(stealth.GetConnectionDailyLimit())
 	if err == nil {
 		fmt.Printf("\n📊 Connection Stats:\n")
 		fmt.Printf("   Total sent: %d\n", connStats.TotalSent)
@@ -185,7 +185,8 @@ func RunConnections(browser *rod.Browser, profileURLs []string) {
 
 	if len(profileURLs) == 0 {
 		// Try to get unprocessed profiles from database
-		unprocessed, _ := store.GetUnprocessedSearchResults(SearchKeywordPeople, MaxConnectionRequests)
+		// Get extra profiles for browsing (3x the daily limit)
+		unprocessed, _ := store.GetUnprocessedSearchResults(SearchKeywordPeople, stealth.GetConnectionDailyLimit()*3)
 		if len(unprocessed) > 0 {
 			fmt.Printf("📋 Found %d unprocessed profiles in database\n", len(unprocessed))
 			for _, r := range unprocessed {
@@ -204,16 +205,17 @@ func RunConnections(browser *rod.Browser, profileURLs []string) {
 	page := browser.MustPage()
 	defer page.Close()
 
-	// Limit requests
-	maxRequests := MaxConnectionRequests
+	// Limit requests based on central config
+	maxRequests := stealth.GetConnectionDailyLimit()
 	if len(profileURLs) < maxRequests {
 		maxRequests = len(profileURLs)
 	}
 
-	fmt.Printf("\n🔗 Sending %d connection requests...\n", maxRequests)
+	fmt.Printf("\n🔗 Will send up to %d connection requests with organic browsing...\n", maxRequests)
 
 	successCount := 0
 	failCount := 0
+	browseIndex := maxRequests // Start browsing from profiles after targets
 
 	// Create scheduler for break management
 	var scheduler *stealth.Scheduler
@@ -226,7 +228,12 @@ func RunConnections(browser *rod.Browser, profileURLs []string) {
 	rateLimiter := stealth.GetRateLimiter()
 	rateLimiter.PrintStats(stealth.ActionConnection)
 
-	for i, profileURL := range profileURLs[:maxRequests] {
+	// Create organic browser for human-like behavior
+	organicBrowser := stealth.NewOrganicBrowser(page)
+
+	for i := 0; i < maxRequests; i++ {
+		targetURL := profileURLs[i]
+
 		// Check rate limits first
 		if can, reason := rateLimiter.CanPerform(stealth.ActionConnection); !can {
 			fmt.Printf("⏸️ Rate limited: %s\n", reason)
@@ -260,21 +267,67 @@ func RunConnections(browser *rod.Browser, profileURLs []string) {
 		}
 
 		// Check if already sent (in database)
-		sent, _ := store.HasSentRequest(profileURL)
+		sent, _ := store.HasSentRequest(targetURL)
 		if sent {
-			fmt.Printf("⏭️ Skipping %s (already sent)\n", profileURL)
+			fmt.Printf("⏭️ Skipping %s (already sent)\n", targetURL)
 			continue
 		}
 
-		fmt.Printf("\n[%d/%d] Processing: %s\n", i+1, maxRequests, profileURL)
+		fmt.Printf("\n========== [%d/%d] Connection Cycle ==========\n", i+1, maxRequests)
 
 		// Update workflow progress
 		workflowState.CurrentIndex = i
-		store.UpdateWorkflowProgress(workflowState.ID, i, "processing_profile")
+		store.UpdateWorkflowProgress(workflowState.ID, i, "organic_browsing")
 
-		err := connect.ConnectWithTracking(page, profileURL, "", noteTemplate, tracker)
+		// ==================== ORGANIC BROWSING PHASE ====================
+		if EnableOrganicBrowsing {
+			// Step 1: Browse a random profile (not the target) for ~10 seconds
+			var browseURL string
+			if browseIndex < len(profileURLs) {
+				browseURL = profileURLs[browseIndex]
+				browseIndex++
+			}
+
+			if browseURL != "" && browseURL != targetURL {
+				fmt.Println("\n📖 Step 1: Browsing random profile...")
+				if err := organicBrowser.BrowseProfile(browseURL); err != nil {
+					fmt.Printf("   ⚠️ Browse failed: %v (continuing)\n", err)
+				}
+				organicBrowser.RandomDelay()
+			}
+
+			// Step 2: Go to feed and scroll for 5-6 seconds
+			fmt.Println("\n📰 Step 2: Checking LinkedIn feed...")
+			if err := organicBrowser.BrowseFeed(); err != nil {
+				fmt.Printf("   ⚠️ Feed browse failed: %v (continuing)\n", err)
+			}
+			organicBrowser.RandomDelay()
+		}
+
+		// ==================== CONNECTION PHASE ====================
+		// Step 3: Quick view target profile (~5 sec) then connect
+		fmt.Printf("\n🎯 Step 3: Target profile: %s\n", targetURL)
+
+		store.UpdateWorkflowProgress(workflowState.ID, i, "connecting")
+
+		// Quick browse the target before connecting
+		if EnableOrganicBrowsing {
+			if err := organicBrowser.BrowseProfileQuick(targetURL); err != nil {
+				fmt.Printf("   ⚠️ Target browse failed: %v\n", err)
+				// Check if critical error
+				if stealth.IsCritical(err) {
+					fmt.Println("🛑 Critical error detected - stopping workflow")
+					workflowState.Status = persistence.WorkflowStatusPaused
+					store.PauseWorkflow(workflowState.ID)
+					break
+				}
+			}
+		}
+
+		// Now send the connection request (page is already on target profile)
+		err := connect.ConnectWithTracking(page, targetURL, "", noteTemplate, tracker)
 		if err != nil {
-			fmt.Printf("❌ Failed: %v\n", err)
+			fmt.Printf("❌ Connection failed: %v\n", err)
 			failCount++
 
 			// Check if this is a critical LinkedIn error
@@ -292,31 +345,39 @@ func RunConnections(browser *rod.Browser, profileURLs []string) {
 			}
 		} else {
 			successCount++
+			fmt.Printf("✅ Connection request sent!\n")
 
 			// Record action for rate limiting
 			rateLimiter.RecordAction(stealth.ActionConnection)
 
-			// Save to database
+			// Save to database (track stats even in dry run mode)
 			req := &persistence.ConnectionRequest{
-				ProfileURL:    profileURL,
+				ProfileURL:    targetURL,
 				Note:          noteTemplate,
 				Status:        persistence.StatusPending,
 				SentAt:        time.Now(),
 				Source:        "search",
 				SearchKeyword: SearchKeywordPeople,
 			}
-			if !DryRunMode {
+
+			if DryRunMode {
+				fmt.Println("   📝 [DRY RUN] Would save connection request to database")
+				// Still increment the daily stat for tracking purposes
+				store.IncrementConnectionsSent()
+			} else {
 				store.SaveConnectionRequest(req)
 			}
 
 			// Mark search result as processed
-			store.MarkSearchResultProcessed(profileURL)
+			store.MarkSearchResultProcessed(targetURL)
 		}
 
-		// Use rate limiter's recommended delay (respects limits)
+		// ==================== DELAY BEFORE NEXT CYCLE ====================
 		if i < maxRequests-1 {
-			delay := rateLimiter.GetRecommendedDelay(stealth.ActionConnection)
-			fmt.Printf("⏳ Waiting %v before next action...\n", delay.Round(time.Second))
+			// Use centralized delay configuration
+			delay := stealth.GetRandomDelay(stealth.ActionConnection)
+
+			fmt.Printf("\n⏳ Waiting %v before next connection cycle...\n", delay.Round(time.Second))
 			time.Sleep(delay)
 		}
 	}
@@ -328,6 +389,9 @@ func RunConnections(browser *rod.Browser, profileURLs []string) {
 	store.CompleteWorkflow(workflowState.ID)
 
 	fmt.Printf("\n✅ Connection Results: %d sent, %d failed\n", successCount, failCount)
+	if EnableOrganicBrowsing {
+		fmt.Println("   (Organic browsing was enabled for stealth)")
+	}
 }
 
 // RunMessaging sends follow-up messages to connections
@@ -367,15 +431,15 @@ func RunMessaging(browser *rod.Browser) {
 	}
 	defer msgService.Close()
 
-	// Set dry run mode
+	// Set dry run mode and use central config for limits
 	msgService.SetDryRun(DryRunMode)
-	msgService.SetDailyLimit(50)
+	msgService.SetDailyLimit(stealth.GetMessageDailyLimit())
 
 	// Show available templates
 	msgService.ListTemplates()
 
 	// Print stats from database
-	msgStats, err := store.GetMessageStats(50)
+	msgStats, err := store.GetMessageStats(stealth.GetMessageDailyLimit())
 	if err == nil {
 		fmt.Printf("\n📊 Message Stats (from database):\n")
 		fmt.Printf("   Total sent: %d\n", msgStats.TotalSent)
@@ -392,11 +456,12 @@ func RunMessaging(browser *rod.Browser) {
 	}
 
 	// Run full workflow (detect connections + send follow-ups)
+	// Use centralized delay config
 	err = msgService.FullWorkflow(
 		MessageTemplate,
 		MaxFollowUpMessages,
-		MessageDelayMin,
-		MessageDelayMax,
+		stealth.GetMessageDelayMin(),
+		stealth.GetMessageDelayMax(),
 	)
 	if err != nil {
 		log.Printf("⚠️ Workflow error: %v\n", err)

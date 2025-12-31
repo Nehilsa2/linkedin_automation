@@ -57,6 +57,11 @@ func (ms *MessagingService) GetRecentUnmessaged(days int) []Connection {
 	return GetRecentConnections(ms.Tracker, days)
 }
 
+// GetConnectionsDaysAgo returns connections that connected exactly `days` ago
+func (ms *MessagingService) GetConnectionsDaysAgo(days int) []Connection {
+	return GetConnectionsDaysAgo(ms.Tracker, days)
+}
+
 // SendFollowUp sends a follow-up message to a connection
 func (ms *MessagingService) SendFollowUp(conn Connection, templateName string) error {
 	return SendTemplatedFollowUp(ms.Page, conn, templateName, ms.Templates, ms.Tracker)
@@ -143,7 +148,19 @@ func (ms *MessagingService) FullWorkflow(templateName string, maxMessages int, d
 
 	// Step 3: Send follow-ups
 	fmt.Println("\n📨 Step 2: Sending follow-up messages...")
-	success, failed, err := ms.AutoFollowUp(templateName, maxMessages, delayMinSec, delayMaxSec)
+	// Send follow-ups to connections who connected exactly 4 days ago
+	targets := ms.GetConnectionsDaysAgo(4)
+	if len(targets) == 0 {
+		fmt.Println("ℹ️ No connections from 4 days ago to message")
+		return nil
+	}
+
+	if len(targets) > maxMessages {
+		targets = targets[:maxMessages]
+	}
+
+	fmt.Printf("📨 Sending follow-ups to %d connections (connected 4 days ago)...\n", len(targets))
+	success, failed, err := ms.SendBatchFollowUps(targets, templateName, delayMinSec, delayMaxSec)
 	if err != nil {
 		return err
 	}

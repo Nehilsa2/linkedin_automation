@@ -1,0 +1,21 @@
+{
+  "safety_level": "conservative",
+  "connection_daily_limit": 10,
+  "connection_hourly_limit": 3,
+  "connection_delay_min_sec": 30,
+  "connection_delay_max_sec": 90,
+  "message_daily_limit": 3,
+  "message_hourly_limit": 1,
+  "message_delay_min_sec": 30,
+  "message_delay_max_sec": 60,
+  "search_daily_limit": 15,
+  "search_hourly_limit": 5,
+  "search_delay_min_sec": 5,
+  "search_delay_max_sec": 20,
+  "burst_limit": 5,
+  "burst_cooldown_sec": 300,
+  "max_session_duration_min": 90,
+  "break_after_actions": 8,
+  "break_duration_min_sec": 60,
+  "break_duration_max_sec": 180
+}
