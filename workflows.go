@@ -447,12 +447,14 @@ func RunMessaging(browser *rod.Browser) {
 		fmt.Printf("   Follow-ups: %d\n", msgStats.FollowUpsSent)
 	}
 
-	// Get unmessaged connections from database
+	// Get unmessaged connections from database (4 days old or older)
 	unmessaged, err := store.GetUnmessagedConnections()
 	if err == nil && len(unmessaged) > 0 {
-		fmt.Printf("\n📋 Found %d unmessaged connections in database\n", len(unmessaged))
+		fmt.Printf("\n📋 Found %d unmessaged connections (4 days old or older) in database\n", len(unmessaged))
 		workflowState.TotalItems = len(unmessaged)
 		store.SaveWorkflowState(workflowState)
+	} else if err == nil && len(unmessaged) == 0 {
+		fmt.Println("ℹ️ No connections from 4 days ago or earlier to message")
 	}
 
 	// Run full workflow (detect connections + send follow-ups)
