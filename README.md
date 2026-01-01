@@ -49,9 +49,7 @@
 </div>
 
 ---
-## 🎥 Project Explanation & Demo
 
-(https://youtu.be/p0N60XByJz0)
 
 
 ## ✨ Features
