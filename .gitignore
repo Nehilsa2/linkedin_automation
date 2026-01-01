@@ -35,8 +35,8 @@ Thumbs.db
 cookies.json
 stealth_config.json
 rate_limiter_state.json
-.env
-*.env
+# .env
+# *.env
 
 # Logs
 *.log
