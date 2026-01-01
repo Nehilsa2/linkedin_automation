@@ -133,7 +133,7 @@ func saveCompanyResultsToDB(urls []string, keyword string) {
 
 // RunConnections sends connection requests to found profiles with organic browsing
 // Flow: Browse random profile -> Feed -> Quick view target -> Connect
-func RunConnections(browser *rod.Browser, profileURLs []string) {
+func RunConnections(page *rod.Page, profileURLs []string) {
 	fmt.Println("\n==================================================")
 	fmt.Println("🔗 CONNECTION WORKFLOW (with organic browsing)")
 	fmt.Println("==================================================")
@@ -171,10 +171,10 @@ func RunConnections(browser *rod.Browser, profileURLs []string) {
 
 	// Set dry run mode and safe daily limit from central config
 	tracker.SetDryRun(DryRunMode)
-	tracker.SetDailyLimit(stealth.GetConnectionDailyLimit())
+	tracker.SetDailyLimit(1)
 
 	// Print stats from database
-	connStats, err := store.GetConnectionRequestStats(stealth.GetConnectionDailyLimit())
+	connStats, err := store.GetConnectionRequestStats(1)
 	if err == nil {
 		fmt.Printf("\n📊 Connection Stats:\n")
 		fmt.Printf("   Total sent: %d\n", connStats.TotalSent)
@@ -186,7 +186,7 @@ func RunConnections(browser *rod.Browser, profileURLs []string) {
 	if len(profileURLs) == 0 {
 		// Try to get unprocessed profiles from database
 		// Get extra profiles for browsing (3x the daily limit)
-		unprocessed, _ := store.GetUnprocessedSearchResults(SearchKeywordPeople, stealth.GetConnectionDailyLimit()*3)
+		unprocessed, _ := store.GetUnprocessedSearchResults(SearchKeywordPeople, 1)
 		if len(unprocessed) > 0 {
 			fmt.Printf("📋 Found %d unprocessed profiles in database\n", len(unprocessed))
 			for _, r := range unprocessed {
@@ -201,12 +201,10 @@ func RunConnections(browser *rod.Browser, profileURLs []string) {
 	// Personalized note template
 	noteTemplate := "Hi! I came across your profile and would love to connect. Looking forward to learning from your experience!"
 
-	// Get a page to work with
-	page := browser.MustPage()
-	defer page.Close()
+	// Use the provided feed page for all browsing (do not open a new page)
 
 	// Limit requests based on central config
-	maxRequests := stealth.GetConnectionDailyLimit()
+	maxRequests := 1
 	if len(profileURLs) < maxRequests {
 		maxRequests = len(profileURLs)
 	}
@@ -447,14 +445,14 @@ func RunMessaging(browser *rod.Browser) {
 		fmt.Printf("   Follow-ups: %d\n", msgStats.FollowUpsSent)
 	}
 
-	// Get unmessaged connections from database (4 days old or older)
+	// Get unmessaged connections from database (no age criteria)
 	unmessaged, err := store.GetUnmessagedConnections()
 	if err == nil && len(unmessaged) > 0 {
-		fmt.Printf("\n📋 Found %d unmessaged connections (4 days old or older) in database\n", len(unmessaged))
+		fmt.Printf("\n📋 Found %d unmessaged connections in database\n", len(unmessaged))
 		workflowState.TotalItems = len(unmessaged)
 		store.SaveWorkflowState(workflowState)
 	} else if err == nil && len(unmessaged) == 0 {
-		fmt.Println("ℹ️ No connections from 4 days ago or earlier to message")
+		fmt.Println("ℹ️ No unmessaged connections found to message")
 	}
 
 	// Run full workflow (detect connections + send follow-ups)

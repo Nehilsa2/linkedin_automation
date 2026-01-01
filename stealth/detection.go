@@ -291,7 +291,8 @@ func checkDOMElements(page *rod.Page) *LinkedInError {
 	result, err := page.Eval(`() => {
 		const checks = {
 			// Captcha iframe
-			captcha: !!document.querySelector('iframe[src*="captcha"], iframe[src*="recaptcha"], #captcha-box'),
+			   // Captcha iframe
+			   captcha: !!document.querySelector('iframe[src*="captcha"], iframe[src*="recaptcha"], #captcha-box'),
 			
 			// Restriction modal
 			restricted: !!document.querySelector('[data-test-modal-id="restriction-modal"], .restriction-modal'),
@@ -324,9 +325,9 @@ func checkDOMElements(page *rod.Page) *LinkedInError {
 
 	checks := result.Value.Map()
 
-	if val, ok := checks["captcha"]; ok && val.Bool() {
-		return createError(ErrorCaptcha)
-	}
+	   if val, ok := checks["captcha"]; ok && val.Bool() {
+		   return createError(ErrorCaptcha)
+	   }
 	if val, ok := checks["restricted"]; ok && val.Bool() {
 		return createError(ErrorAccountRestricted)
 	}
@@ -611,18 +612,18 @@ func MonitorPage(page *rod.Page, errorChan chan<- *LinkedInError, stopChan <-cha
 
 // PrintDetectionStatus prints a summary of detection status
 func PrintDetectionStatus(result *DetectionResult) {
-	if !result.HasError {
-		fmt.Println("✅ Page Status: OK")
-		return
-	}
+	// if !result.HasError {
+	//     fmt.Println("✅ Page Status: OK")
+	//     return
+	// }
 
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Printf("⚠️ ERROR DETECTED\n")
-	fmt.Printf("   Type: %s\n", result.Error.Type)
-	fmt.Printf("   Message: %s\n", result.Error.Message)
-	fmt.Printf("   Recoverable: %v\n", result.Error.Recoverable)
-	fmt.Printf("   Action: %s\n", result.Error.Action)
-	fmt.Printf("   URL: %s\n", result.PageURL)
-	fmt.Printf("   Time: %s\n", result.CheckedAt.Format("15:04:05"))
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	// fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	// fmt.Printf("⚠️ ERROR DETECTED\n")
+	// fmt.Printf("   Type: %s\n", result.Error.Type)
+	// fmt.Printf("   Message: %s\n", result.Error.Message)
+	// fmt.Printf("   Recoverable: %v\n", result.Error.Recoverable)
+	// fmt.Printf("   Action: %s\n", result.Error.Action)
+	// fmt.Printf("   URL: %s\n", result.PageURL)
+	// fmt.Printf("   Time: %s\n", result.CheckedAt.Format("15:04:05"))
+	// fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 }

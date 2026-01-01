@@ -148,10 +148,10 @@ func (ms *MessagingService) FullWorkflow(templateName string, maxMessages int, d
 
 	// Step 3: Send follow-ups
 	fmt.Println("\n📨 Step 2: Sending follow-up messages...")
-	// Send follow-ups to connections who connected exactly 4 days ago
-	targets := ms.GetConnectionsDaysAgo(4)
+	// Send follow-ups to all unmessaged connections (no days filter)
+	targets := ms.GetUnmessagedConnections()
 	if len(targets) == 0 {
-		fmt.Println("ℹ️ No connections from 4 days ago to message")
+		fmt.Println("ℹ️ No unmessaged connections found to message")
 		return nil
 	}
 
@@ -159,7 +159,7 @@ func (ms *MessagingService) FullWorkflow(templateName string, maxMessages int, d
 		targets = targets[:maxMessages]
 	}
 
-	fmt.Printf("📨 Sending follow-ups to %d connections (connected 4 days ago)...\n", len(targets))
+	fmt.Printf("📨 Sending follow-ups to %d connections...\n", len(targets))
 	success, failed, err := ms.SendBatchFollowUps(targets, templateName, delayMinSec, delayMaxSec)
 	if err != nil {
 		return err

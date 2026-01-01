@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 
@@ -13,13 +14,8 @@ import (
 	"github.com/Nehilsa2/linkedin_automation/stealth"
 )
 
-// Configuration - Set these to control which workflows run
+// Configuration
 const (
-	// Enable/disable workflows
-	RunSearchWorkflow     = true
-	RunConnectionWorkflow = true
-	RunMessagingWorkflow  = true
-
 	// Dry run mode (set to false to perform real actions)
 	DryRunMode = true
 
@@ -28,7 +24,7 @@ const (
 
 	// Search settings
 	SearchKeywordPeople    = "software engineer"
-	SearchKeywordCompanies = "fintech"
+	SearchKeywordCompanies = "E-commerce"
 	SearchMaxPages         = 2
 
 	// Organic browsing settings
@@ -36,7 +32,7 @@ const (
 
 	// Messaging settings
 	MessageTemplate     = "follow_up_simple"
-	MaxFollowUpMessages = 3
+	MaxFollowUpMessages = 1
 
 	// Database settings
 	DatabasePath = "linkedin_automation.db"
@@ -50,12 +46,14 @@ const (
 var store *persistence.Store
 
 func main() {
+	workflow := flag.String("workflow", "search", "Workflow to run: search, connect, followup")
+	flag.Parse()
+
 	if err := godotenv.Load(); err != nil {
 		log.Println("⚠️ Unable to load .env file; falling back to existing environment variables")
 	}
 
 	// ==================== RATE LIMIT CONFIG ====================
-	// Initialize rate limiting with the chosen safety level
 	stealth.SetSafetyLevel(DefaultSafetyLevel)
 	stealth.PrintConfig()
 
@@ -72,11 +70,9 @@ func main() {
 			}
 		}
 
-		// Start activity burst
 		scheduler.StartBurst()
 	}
 
-	// Initialize persistence store
 	var err error
 	store, err = persistence.NewStore(DatabasePath)
 	if err != nil {
@@ -85,24 +81,17 @@ func main() {
 	defer store.Close()
 
 	fmt.Println("✅ Database initialized:", DatabasePath)
-
-	// Migrate existing JSON data if present
 	store.MigrateFromJSON()
-
-	// Check for resumable workflows
 	checkResumableWorkflows()
 
-	// ==================== BROWSER SETUP ====================
-	// Simple browser setup with minimal anti-detection
-	// Only disables the webdriver flag - nothing else
 	u := launcher.New().
+		Bin("C://Program Files//Google//Chrome//Application//chrome.exe").
 		Set("disable-blink-features", "AutomationControlled").
-		Headless(false). // VISIBLE browser window
+		Headless(false).
 		Leakless(false).
 		MustLaunch()
 
 	browser := rod.New().ControlURL(u).MustConnect()
-
 	defer browser.MustClose()
 
 	err = auth.EnsureAuthenticated(browser)
@@ -110,7 +99,6 @@ func main() {
 		log.Fatal("❌ Authentication failed:", err)
 	}
 
-	// Use the authenticated feed page for organic browsing
 	pages, err := browser.Pages()
 	if err != nil || len(pages) == 0 {
 		log.Fatal("❌ Could not get feed page after authentication")
@@ -120,29 +108,28 @@ func main() {
 	organicBrowser.BrowseFeed()
 	organicBrowser.RandomDelay()
 
-	var people []string
-
-	// ==================== SEARCH WORKFLOW ====================
-	if RunSearchWorkflow {
-		var companies []string
+	switch *workflow {
+	case "search":
+		var people, companies []string
 		people, companies = RunSearch(browser)
 		fmt.Printf("\n📋 Search Summary: %d people, %d companies\n", len(people), len(companies))
-	}
-
-	// ==================== CONNECTION WORKFLOW ====================
-	if RunConnectionWorkflow {
-		RunConnections(browser, people)
-	}
-
-	// // ==================== MESSAGING WORKFLOW ====================
-	if RunMessagingWorkflow {
+	case "connect":
+		// Get unprocessed profiles from DB for connection workflow
+		unprocessed, _ := store.GetUnprocessedSearchResults(SearchKeywordPeople, stealth.GetConnectionDailyLimit())
+		var people []string
+		for _, r := range unprocessed {
+			people = append(people, r.ProfileURL)
+		}
+		RunConnections(feedPage, people)
+	case "followup":
 		RunMessaging(browser)
+	default:
+		fmt.Println("❌ Unknown workflow. Use: search, connect, followup")
+		return
 	}
 
-	// Print session summary
 	printSessionSummary()
-
-	fmt.Println("\n✅ All workflows completed!")
+	fmt.Println("\n✅ Workflow completed!")
 }
 
 // checkResumableWorkflows checks for any paused workflows that can be resumed

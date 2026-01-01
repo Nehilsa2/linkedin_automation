@@ -215,20 +215,18 @@ func (s *Store) GetMessageStats(dailyLimit int) (*MessageStats, error) {
 
 // GetUnmessagedConnections returns connections we haven't messaged yet
 func (s *Store) GetUnmessagedConnections() ([]Connection, error) {
-	// Only return connections that are unmessaged and at least 4 days old
+	// Return all unmessaged connections regardless of age
 	rows, err := s.db.Query(`
-			 SELECT id, profile_url, name, headline, company, connected_at,
-							has_messaged, last_message_at, message_count, notes
-			 FROM connections
-			 WHERE has_messaged = FALSE
-				 AND connected_at <= datetime('now', '-4 days')
-			 ORDER BY connected_at DESC
-	 `)
+				SELECT id, profile_url, name, headline, company, connected_at,
+								has_messaged, last_message_at, message_count, notes
+				FROM connections
+				WHERE has_messaged = FALSE
+				ORDER BY connected_at DESC
+		 `)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
 	return scanConnections(rows)
 }
 
