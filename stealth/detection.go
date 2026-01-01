@@ -325,9 +325,9 @@ func checkDOMElements(page *rod.Page) *LinkedInError {
 
 	checks := result.Value.Map()
 
-	   if val, ok := checks["captcha"]; ok && val.Bool() {
-		   return createError(ErrorCaptcha)
-	   }
+	if val, ok := checks["captcha"]; ok && val.Bool() {
+		return createError(ErrorCaptcha)
+	}
 	if val, ok := checks["restricted"]; ok && val.Bool() {
 		return createError(ErrorAccountRestricted)
 	}
